@@ -1,0 +1,13 @@
+[package]
+name = "scoundrel"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+anyhow = "1.0.97"
+bevy_ecs = "0.15.3"
+crossterm = "0.28.1"
+lazy_static = "1.5.0"
+rand = "0.9.0"
+strum = "0.27.1"
+strum_macros = "0.27.1"
