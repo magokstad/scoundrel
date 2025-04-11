@@ -1,6 +1,5 @@
-use std::fmt::Display;
+use std::{collections::VecDeque, fmt::Display};
 
-use anyhow::Result;
 use bevy_ecs::prelude::*;
 use rand::{rng, seq::SliceRandom};
 use strum::IntoEnumIterator;
@@ -55,6 +54,30 @@ impl Card {
     pub fn is_face_card(&self) -> bool {
         self.rank.is_face()
     }
+
+    pub fn emojify(&self) -> String {
+        let mut tmp: String = String::new();
+
+        let suit_str = match self.suit {
+            Suit::Hearts => "♥ ",
+            Suit::Diamond => "♦ ",
+            Suit::Spades => "♠ ",
+            Suit::Clubs => "♣ ",
+        };
+        let rank_str = match self.rank {
+            Rank::Ace => " A",
+            Rank::King => " K",
+            Rank::Queen => " Q",
+            Rank::Jack => " J",
+            Rank::Ten => "10",
+            rank => {
+                tmp = format!(" {}", rank as u8);
+                tmp.as_str()
+            }
+        };
+
+        format!("{}{}", suit_str, rank_str)
+    }
 }
 
 impl Display for Card {
@@ -65,31 +88,25 @@ impl Display for Card {
 
 #[derive(Component, Default)]
 pub struct Deck {
-    cards: Vec<Entity>,
+    cards: VecDeque<Card>,
 }
 
-// #[derive(Bundle)]
-// pub struct DeckBundle {
-//     deck: Deck,
-// }
-
 impl Deck {
-    pub fn new_classic(commands: &mut Commands) -> Self {
-        let mut deck = vec![];
+    pub fn new_classic() -> Self {
+        let mut deck = VecDeque::new();
 
         for suit in Suit::iter() {
             for rank in Rank::iter() {
                 let card = Card::new(suit.to_owned(), rank.to_owned());
-                let card_entity = commands.spawn(card).id();
-                deck.push(card_entity);
+                deck.push_front(card);
             }
         }
 
         Self { cards: deck }
     }
 
-    pub fn new_scoundrel(commands: &mut Commands) -> Deck {
-        let mut deck = vec![];
+    pub fn new_scoundrel() -> Self {
+        let mut deck = VecDeque::new();
 
         for suit in Suit::iter() {
             for rank in Rank::iter() {
@@ -98,8 +115,7 @@ impl Deck {
                     (r, Suit::Hearts) if r.is_face() => {}
                     (r, s) => {
                         let card = Card::new(s, r);
-                        let card_entity = commands.spawn(card).id();
-                        deck.push(card_entity);
+                        deck.push_front(card);
                     }
                 }
             }
@@ -108,17 +124,44 @@ impl Deck {
         Self { cards: deck }
     }
 
-    pub fn empty() -> Self {
-        Self { cards: vec![] }
+    pub fn shuffled_scoundrel() -> Self {
+        let mut deck = Self::new_scoundrel();
+        deck.shuffle();
+
+        deck
     }
-}
 
-pub fn shuffle(mut decks: Query<&mut Deck>) -> Result<()> {
-    let mut deck = decks.get_single_mut()?;
-    let mut rng = rng();
+    pub fn empty() -> Self {
+        Self {
+            cards: VecDeque::new(),
+        }
+    }
 
-    deck.cards.shuffle(&mut rng);
-    println!("Deck Shuffled!");
+    pub fn shuffle(&mut self) {
+        let mut rng = rng();
+        let cards: Vec<_> = self.cards.drain(..).collect();
+        let mut shuffled = cards;
+        shuffled.shuffle(&mut rng);
+        self.cards = VecDeque::from(shuffled);
+    }
 
-    Ok(())
+    pub fn draw(&mut self) -> Option<Card> {
+        self.cards.pop_front()
+    }
+
+    pub fn insert(&mut self, card: Card) {
+        self.cards.push_back(card);
+    }
+
+    pub fn peek(&self) -> Option<&Card> {
+        self.cards.front()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.cards.is_empty()
+    }
+
+    pub fn count(&self) -> usize {
+        self.cards.len()
+    }
 }
