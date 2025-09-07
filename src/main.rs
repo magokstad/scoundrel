@@ -3,7 +3,10 @@ use std::sync::{Arc, Mutex};
 use bevy_ecs::prelude::*;
 use common::{Input, View};
 use lazy_static::lazy_static;
-use scoundrel::{DrawDeck, Scoundrel, select_card};
+use scoundrel::{
+    DrawDeck, Scoundrel, check_health, clear_action, handle_new_round, manage_selection,
+    next_round, select_card, start_game,
+};
 use tui::Tui;
 
 pub mod cards;
@@ -26,8 +29,20 @@ fn main() {
     let mut deinit = Schedule::default();
     let mut update = Schedule::default();
 
-    init.add_systems((setup, Tui::init_display).chain());
-    update.add_systems((Tui::process_input, Tui::display, select_card).chain());
+    init.add_systems((setup, start_game, Tui::init_display).chain());
+    update.add_systems(
+        (
+            Tui::process_input,
+            Tui::display,
+            manage_selection,
+            select_card,
+            check_health,
+            next_round,
+            handle_new_round,
+            clear_action,
+        )
+            .chain(),
+    );
     deinit.add_systems((Tui::deinit_display).chain());
 
     init.run(&mut world);

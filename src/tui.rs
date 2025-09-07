@@ -2,7 +2,7 @@ use std::{io, sync::atomic::AtomicU16, time::Duration};
 
 use bevy_ecs::prelude::*;
 use crossterm::{
-    cursor::MoveTo,
+    cursor::{Hide, MoveTo, Show},
     event::{
         DisableFocusChange, DisableMouseCapture, EnableFocusChange, EnableMouseCapture, Event,
         KeyCode, KeyModifiers, poll, read,
@@ -48,9 +48,13 @@ fn print_board(board: &Board, selection: &Selection) {
             "{} {}",
             match board.0[i] {
                 Some(c) => c.emojify(),
-                None => String::new(),
+                None => String::from("    "),
             },
-            if selection.0 == i { "selected" } else { "" }
+            if selection.0 == i {
+                "selected"
+            } else {
+                "          "
+            }
         )
     };
 
@@ -71,7 +75,9 @@ fn print_board(board: &Board, selection: &Selection) {
 fn print_weapon(weapon: &WeaponSlot) {
     let weapon_string = match weapon {
         WeaponSlot::Empty => String::new(),
-        WeaponSlot::Weapon { weapon, enemies } if enemies.is_empty() => weapon.emojify(),
+        WeaponSlot::Weapon { weapon, enemies } if enemies.is_empty() => {
+            weapon.emojify() + "                  "
+        }
         WeaponSlot::Weapon { weapon, enemies } => {
             format!(
                 "{} stabbing {}",
@@ -94,6 +100,16 @@ fn print_draw(draw: &DrawDeck) {
     .expect("display draw failed");
 }
 
+pub fn print_log(msg: &'static str) {
+    execute!(
+        io::stdout(),
+        MoveTo(20, 20),
+        // Print(format!("{} cards left", draw.0.count()))
+        Print(msg.to_string() + "                    ")
+    )
+    .expect("display log failed");
+}
+
 impl View for Tui {
     fn init_display() {
         execute!(
@@ -101,13 +117,20 @@ impl View for Tui {
             EnableFocusChange,
             EnableMouseCapture,
             Clear(ClearType::All),
+            Hide,
         )
         .unwrap();
         enable_raw_mode().expect("raw mode failed");
     }
 
     fn deinit_display() {
-        execute!(std::io::stdout(), DisableFocusChange, DisableMouseCapture).unwrap();
+        execute!(
+            std::io::stdout(),
+            DisableFocusChange,
+            DisableMouseCapture,
+            Show,
+        )
+        .unwrap();
         disable_raw_mode().expect("disable raw mode failed");
     }
 
@@ -128,6 +151,7 @@ impl View for Tui {
         print_health(health);
         print_board(board, selection);
         print_weapon(weapon);
+        print_draw(draw);
     }
 }
 
@@ -139,18 +163,22 @@ impl Input for Tui {
             match read().unwrap() {
                 Event::Key(key_event) => match key_event.code {
                     KeyCode::Enter => {
+                        print_log("Enter");
                         *action = Action::EndTurn;
                         return;
                     }
                     KeyCode::Char(' ') => {
+                        print_log("SPACE");
                         *action = Action::Select;
                         return;
                     }
                     KeyCode::Backspace => {
+                        print_log("BackSPACE");
                         *action = Action::SkipRoom;
                         return;
                     }
                     KeyCode::Char('p') => {
+                        print_log("pushing P");
                         *RUNNING.lock().unwrap() = false;
                     }
                     KeyCode::Char('c') => {
@@ -160,16 +188,20 @@ impl Input for Tui {
                             return;
                         }
                     }
-                    KeyCode::Left | KeyCode::Char('a') => {
+                    KeyCode::Left | KeyCode::Up | KeyCode::Char('a') | KeyCode::Char('w') => {
                         *action = Action::Left;
                         return;
                     }
-                    KeyCode::Right | KeyCode::Char('d') => {
+                    KeyCode::Right | KeyCode::Down | KeyCode::Char('d') | KeyCode::Char('s') => {
                         *action = Action::Right;
                         return;
                     }
-                    KeyCode::Char(n) if ['1', '2', '3', '4'].contains(&n) => {
-                        *action = Action::Slot(n as usize - '0' as usize);
+                    // KeyCode::Char(n) if ['1', '2', '3', '4'].contains(&n) => {
+                    //     *action = Action::Slot(n as usize - '0' as usize);
+                    //     return;
+                    // }
+                    KeyCode::Char(n @ '1'..='4') => {
+                        *action = Action::Slot(n.to_digit(10).unwrap() as usize);
                         return;
                     }
                     _ => {}
