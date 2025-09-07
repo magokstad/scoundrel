@@ -1,11 +1,11 @@
-use std::sync::{Arc, Mutex};
+use std::sync::Mutex;
 
 use bevy_ecs::prelude::*;
 use common::{Input, View};
 use lazy_static::lazy_static;
 use scoundrel::{
-    DrawDeck, Scoundrel, check_health, clear_action, handle_new_round, manage_selection,
-    next_round, select_card, start_game,
+    Scoundrel, check_health, clear_action, handle_new_round, manage_selection, next_round,
+    select_card, start_game,
 };
 use tui::Tui;
 

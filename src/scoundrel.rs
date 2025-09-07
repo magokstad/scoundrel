@@ -158,7 +158,7 @@ pub fn select_card(
 }
 
 pub fn manage_selection(mut actions: Query<&mut Action>, mut selections: Query<&mut Selection>) {
-    let mut action = actions.single_mut();
+    let action = actions.single_mut();
     let mut selection = selections.single_mut();
 
     match *action {
