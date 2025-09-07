@@ -192,10 +192,6 @@ impl Input for Tui {
                         *action = Action::Right;
                         return;
                     }
-                    // KeyCode::Char(n) if ['1', '2', '3', '4'].contains(&n) => {
-                    //     *action = Action::Slot(n as usize - '0' as usize);
-                    //     return;
-                    // }
                     KeyCode::Char(n @ '1'..='4') => {
                         *action = Action::Slot(n.to_digit(10).unwrap() as usize);
                         return;
