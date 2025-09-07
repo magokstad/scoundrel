@@ -5,7 +5,6 @@ use bevy_ecs::prelude::*;
 use crate::{
     RUNNING,
     cards::{Card, Deck, Suit},
-    tui::print_log,
 };
 
 #[derive(Component, Default)]
@@ -95,7 +94,6 @@ pub fn select_card(
     if *action != Action::Select {
         return;
     }
-    print_log("wrf");
     let selection = selections.single();
     // let mut draw = draws.single_mut();
     let mut board = boards.single_mut();

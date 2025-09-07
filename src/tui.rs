@@ -163,22 +163,18 @@ impl Input for Tui {
             match read().unwrap() {
                 Event::Key(key_event) => match key_event.code {
                     KeyCode::Enter => {
-                        print_log("Enter");
                         *action = Action::EndTurn;
                         return;
                     }
                     KeyCode::Char(' ') => {
-                        print_log("SPACE");
                         *action = Action::Select;
                         return;
                     }
                     KeyCode::Backspace => {
-                        print_log("BackSPACE");
                         *action = Action::SkipRoom;
                         return;
                     }
                     KeyCode::Char('p') => {
-                        print_log("pushing P");
                         *RUNNING.lock().unwrap() = false;
                     }
                     KeyCode::Char('c') => {
