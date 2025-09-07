@@ -1,6 +1,7 @@
 use std::{collections::VecDeque, fmt::Display};
 
 use bevy_ecs::prelude::*;
+use crossterm::style::Stylize;
 use rand::{rng, seq::SliceRandom};
 use strum::IntoEnumIterator;
 use strum_macros::{Display, EnumCount, EnumIter};
@@ -61,10 +62,10 @@ impl Card {
         let tmp: String; // = String::new();
 
         let suit_str = match self.suit {
-            Suit::Hearts => "♥ ",
-            Suit::Diamond => "♦ ",
-            Suit::Spades => "♠ ",
-            Suit::Clubs => "♣ ",
+            Suit::Hearts => "♥ ".red(),
+            Suit::Diamond => "♦ ".red(),
+            Suit::Spades => "♠ ".blue(),
+            Suit::Clubs => "♣ ".blue(),
         };
         let rank_str = match self.rank {
             Rank::Ace => " A",
