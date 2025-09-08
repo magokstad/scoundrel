@@ -83,10 +83,8 @@ pub fn start_game(mut boards: Query<&mut Board>, mut draws: Query<&mut DrawDeck>
 }
 
 pub fn select_card(
-    // mut commands: Commands,
-    actions: Query<&mut Action>,
-    selections: Query<&mut Selection>,
-    // mut draws: Query<&mut DrawDeck>,
+    actions: Query<&Action>,
+    selections: Query<&Selection>,
     mut boards: Query<&mut Board>,
     mut weapons: Query<&mut WeaponSlot>,
     mut healths: Query<&mut Health>,
@@ -94,76 +92,79 @@ pub fn select_card(
 ) {
     let action = actions.single();
     let selection = selections.single();
-    // let mut draw = draws.single_mut();
     let mut board = boards.single_mut();
     let mut health = healths.single_mut();
     let mut weapon_slot = weapons.single_mut();
     let mut status = statuses.single_mut();
 
-    // Have to spare last card
-    let n_cards = board.0.iter().filter(|card| card.is_some()).count();
+    // Must leave at least one card
+    let n_cards = board.0.iter().filter(|c| c.is_some()).count();
     if n_cards <= 1 {
+        return;
+    }
+
+    // Only proceed if action is Select or BareHand
+    if !matches!(*action, Action::Select | Action::BareHand) {
+        return;
+    }
+
+    let Some(selected) = board.0[selection.0] else {
         return;
     };
 
-    if *action != Action::Select || *action != Action::BareHand {
-        return;
+    match selected.suit {
+        Suit::Hearts => apply_heal(&mut health, &mut status, selected.rank as i8),
+        Suit::Diamond => retrieve_weapon(&mut weapon_slot, selected),
+        Suit::Clubs | Suit::Spades => fight(&mut health, &mut weapon_slot, action, selected),
     }
 
-    match board.0[selection.0] {
-        Some(selected) => match selected.suit {
-            // HEAL
-            Suit::Hearts => {
-                if !status.has_healed {
-                    health.0 += selected.rank as i8;
-                }
-                if health.0 > 20 {
-                    health.0 = 20
-                }
-                status.has_healed = true;
-            }
-            // RETRIEVE WEAPON
-            Suit::Diamond => {
-                *weapon_slot = WeaponSlot::Weapon {
-                    weapon: selected,
-                    enemies: Deck::empty(),
-                };
-            }
-            // FIGHT
-            Suit::Clubs | Suit::Spades => {
-                if *action == Action::BareHand {
-                    health.0 -= selected.rank as i8;
-                }
-
-                match weapon_slot.clone() {
-                    WeaponSlot::Empty => health.0 -= selected.rank as i8,
-                    WeaponSlot::Weapon {
-                        weapon,
-                        mut enemies,
-                    } => {
-                        let weapon_rank = match enemies.peek() {
-                            Some(s) => min(s.rank as i8, weapon.rank as i8),
-                            None => weapon.rank as i8,
-                        };
-                        // weapon_dam - enemy_health
-                        // min(weapon_dam, stabbed_enemy_health) - (enemy_health)
-                        match weapon_rank.cmp(&(selected.rank as i8)) {
-                            std::cmp::Ordering::Less => {
-                                health.0 -= selected.rank as i8 - weapon_rank
-                            }
-                            std::cmp::Ordering::Equal | std::cmp::Ordering::Greater => {
-                                enemies.add_top(selected);
-                            }
-                        }
-                        *weapon_slot = WeaponSlot::Weapon { weapon, enemies }
-                    }
-                }
-            }
-        },
-        None => return,
-    }
+    // Remove the used card
     board.0[selection.0] = None;
-    // TODO: discard pile?
+    // TODO: move to discard pile?
+}
+
+fn apply_heal(health: &mut Health, status: &mut Status, rank: i8) {
+    if !status.has_healed {
+        health.0 += rank as i8;
+        if health.0 > 20 {
+            health.0 = 20;
+        }
+        status.has_healed = true;
+    }
+}
+
+fn retrieve_weapon(slot: &mut WeaponSlot, card: Card) {
+    *slot = WeaponSlot::Weapon {
+        weapon: card,
+        enemies: Deck::empty(),
+    };
+}
+
+fn fight(health: &mut Health, slot: &mut WeaponSlot, action: &Action, enemy: Card) {
+    if action == &Action::BareHand {
+        health.0 -= enemy.rank as i8;
+    }
+
+    match slot {
+        WeaponSlot::Empty => {
+            health.0 -= enemy.rank as i8;
+        }
+        WeaponSlot::Weapon { weapon, enemies } => {
+            let weapon_rank = enemies
+                .peek()
+                .map(|e| min(e.rank as i8, weapon.rank as i8))
+                .unwrap_or(weapon.rank as i8);
+
+            match weapon_rank.cmp(&(enemy.rank as i8)) {
+                std::cmp::Ordering::Less => {
+                    health.0 -= enemy.rank as i8 - weapon_rank;
+                }
+                std::cmp::Ordering::Equal | std::cmp::Ordering::Greater => {
+                    enemies.add_top(enemy);
+                }
+            }
+        }
+    }
 }
 
 pub fn manage_selection(mut actions: Query<&mut Action>, mut selections: Query<&mut Selection>) {
