@@ -20,6 +20,7 @@ use crate::{
 };
 
 lazy_static! {
+    // static ref BOMBOX: u16 =
     static ref STARTX: u16 = 4;
     static ref STARTY: u16 = 2;
     static ref X: AtomicU16 = AtomicU16::new(*STARTX);
@@ -51,7 +52,7 @@ fn print_board(board: &Board, selection: &Selection) {
                 None => String::from("    "),
             },
             if selection.0 == i {
-                "selected"
+                "<--"
             } else {
                 "          "
             }
@@ -176,6 +177,9 @@ impl Input for Tui {
                     }
                     KeyCode::Char('p') => {
                         *RUNNING.lock().unwrap() = false;
+                    }
+                    KeyCode::Char('b') => {
+                        *action = Action::BareHand;
                     }
                     KeyCode::Char('c') => {
                         if key_event.modifiers.contains(KeyModifiers::CONTROL) {

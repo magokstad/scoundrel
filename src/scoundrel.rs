@@ -1,4 +1,4 @@
-use std::ops::Add;
+use std::{cmp::min, ops::Add};
 
 use bevy_ecs::prelude::*;
 
@@ -23,7 +23,7 @@ pub struct Selection(pub usize);
 pub struct Status {
     queue_next_round: bool,
     has_healed: bool,
-    n_skips: u8,
+    avoided_last: bool,
 }
 
 #[derive(Component, Default, Clone)]
@@ -45,6 +45,8 @@ pub enum Action {
     Select,
     Left,
     Right,
+
+    BareHand,
 
     SkipRoom,
     EndTurn,
@@ -91,9 +93,6 @@ pub fn select_card(
     mut statuses: Query<&mut Status>,
 ) {
     let action = actions.single();
-    if *action != Action::Select {
-        return;
-    }
     let selection = selections.single();
     // let mut draw = draws.single_mut();
     let mut board = boards.single_mut();
@@ -107,47 +106,59 @@ pub fn select_card(
         return;
     };
 
+    if *action != Action::Select || *action != Action::BareHand {
+        return;
+    }
+
     match board.0[selection.0] {
-        Some(card) => match card.suit {
+        Some(selected) => match selected.suit {
+            // HEAL
             Suit::Hearts => {
-                if status.has_healed {
-                    return;
+                if !status.has_healed {
+                    health.0 += selected.rank as i8;
                 }
-                health.0 += card.rank as i8;
                 if health.0 > 20 {
                     health.0 = 20
                 }
                 status.has_healed = true;
             }
+            // RETRIEVE WEAPON
             Suit::Diamond => {
                 *weapon_slot = WeaponSlot::Weapon {
-                    weapon: card,
+                    weapon: selected,
                     enemies: Deck::empty(),
                 };
             }
-            // TODO: figure this stuff out... Clone is not good here...
-            // TODO: make unit tests??? this thing buggyyyy most likelyyy
-            Suit::Clubs | Suit::Spades => match weapon_slot.clone() {
-                // Attack without weapon
-                WeaponSlot::Empty => health.0 -= card.rank as i8,
-                // Attack with weapon
-                WeaponSlot::Weapon {
-                    weapon,
-                    mut enemies,
-                } => {
-                    match enemies.peek() {
-                        // take all damage as weapon is dulled
-                        Some(enemy) if card.rank > enemy.rank => health.0 -= card.rank as i8,
-                        // take damage, damage can't be negtive
-                        Some(_) | None => {
-                            let damage = card.rank as i8 - weapon.rank as i8;
-                            health.0 -= if damage > 0 { damage } else { 0 };
-                            enemies.add_top(card);
-                        }
-                    }
-                    *weapon_slot = WeaponSlot::Weapon { weapon, enemies }
+            // FIGHT
+            Suit::Clubs | Suit::Spades => {
+                if *action == Action::BareHand {
+                    health.0 -= selected.rank as i8;
                 }
-            },
+
+                match weapon_slot.clone() {
+                    WeaponSlot::Empty => health.0 -= selected.rank as i8,
+                    WeaponSlot::Weapon {
+                        weapon,
+                        mut enemies,
+                    } => {
+                        let weapon_rank = match enemies.peek() {
+                            Some(s) => min(s.rank as i8, weapon.rank as i8),
+                            None => weapon.rank as i8,
+                        };
+                        // weapon_dam - enemy_health
+                        // min(weapon_dam, stabbed_enemy_health) - (enemy_health)
+                        match weapon_rank.cmp(&(selected.rank as i8)) {
+                            std::cmp::Ordering::Less => {
+                                health.0 -= selected.rank as i8 - weapon_rank
+                            }
+                            std::cmp::Ordering::Equal | std::cmp::Ordering::Greater => {
+                                enemies.add_top(selected);
+                            }
+                        }
+                        *weapon_slot = WeaponSlot::Weapon { weapon, enemies }
+                    }
+                }
+            }
         },
         None => return,
     }
@@ -181,7 +192,7 @@ pub fn next_round(
     match *action {
         Action::SkipRoom => {
             // TODO: change magic number to MAX_SKIPS
-            if status.n_skips >= 2 {
+            if status.avoided_last {
                 return;
             }
 
@@ -193,7 +204,7 @@ pub fn next_round(
                 board.0[i] = draw.0.draw();
             }
 
-            status.n_skips += 1;
+            status.avoided_last = true;
             status.queue_next_round = true;
         }
         Action::EndTurn => {
@@ -207,6 +218,7 @@ pub fn next_round(
                     board.0[i] = draw.0.draw();
                 }
             }
+            status.avoided_last = false;
             status.queue_next_round = true;
         }
         _ => {}
