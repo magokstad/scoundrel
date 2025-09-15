@@ -6,7 +6,7 @@ use rand::{rng, seq::SliceRandom};
 use strum::IntoEnumIterator;
 use strum_macros::{Display, EnumCount, EnumIter};
 
-pub const ACE_VAL: isize = 1;
+pub const ACE_VAL: isize = 14;
 
 #[derive(
     Debug, Default, EnumCount, EnumIter, Display, Clone, Copy, PartialEq, Eq, PartialOrd, Ord,

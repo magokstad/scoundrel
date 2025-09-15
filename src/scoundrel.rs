@@ -1,5 +1,6 @@
 use std::{cmp::min, ops::Add};
 
+use anyhow::{Error, Result};
 use bevy_ecs::prelude::*;
 
 use crate::{
@@ -115,7 +116,12 @@ pub fn select_card(
     match selected.suit {
         Suit::Hearts => apply_heal(&mut health, &mut status, selected.rank as i8),
         Suit::Diamond => retrieve_weapon(&mut weapon_slot, selected),
-        Suit::Clubs | Suit::Spades => fight(&mut health, &mut weapon_slot, action, selected),
+        Suit::Clubs | Suit::Spades => {
+            match fight(&mut health, &mut weapon_slot, action, selected) {
+                Ok(_) => {}
+                Err(_) => return,
+            }
+        }
     }
 
     // Remove the used card
@@ -140,9 +146,15 @@ fn retrieve_weapon(slot: &mut WeaponSlot, card: Card) {
     };
 }
 
-fn fight(health: &mut Health, slot: &mut WeaponSlot, action: &Action, enemy: Card) {
+fn fight(
+    health: &mut Health,
+    slot: &mut WeaponSlot,
+    action: &Action,
+    enemy: Card,
+) -> Result<(), &'static str> {
     if action == &Action::BareHand {
         health.0 -= enemy.rank as i8;
+        return Ok(());
     }
 
     match slot {
@@ -150,21 +162,26 @@ fn fight(health: &mut Health, slot: &mut WeaponSlot, action: &Action, enemy: Car
             health.0 -= enemy.rank as i8;
         }
         WeaponSlot::Weapon { weapon, enemies } => {
-            let weapon_rank = enemies
-                .peek()
-                .map(|e| min(e.rank as i8, weapon.rank as i8))
-                .unwrap_or(weapon.rank as i8);
-
-            match weapon_rank.cmp(&(enemy.rank as i8)) {
-                std::cmp::Ordering::Less => {
-                    health.0 -= enemy.rank as i8 - weapon_rank;
-                }
-                std::cmp::Ordering::Equal | std::cmp::Ordering::Greater => {
-                    enemies.add_top(enemy);
+            if let Some(last_kill) = enemies.peek() {
+                if (last_kill.rank as i8) < (enemy.rank as i8) {
+                    return Err("Can't choose opt");
                 }
             }
+
+            let weapon_rank = enemies
+                .peek()
+                .map(|last_kill| min(last_kill.rank as i8, weapon.rank as i8))
+                .unwrap_or(weapon.rank as i8);
+
+            if weapon_rank < enemy.rank as i8 {
+                health.0 -= enemy.rank as i8 - weapon_rank;
+            }
+
+            enemies.add_top(enemy);
         }
     }
+
+    Ok(())
 }
 
 pub fn manage_selection(mut actions: Query<&mut Action>, mut selections: Query<&mut Selection>) {

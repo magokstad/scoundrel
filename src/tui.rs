@@ -180,6 +180,7 @@ impl Input for Tui {
                     }
                     KeyCode::Char('b') => {
                         *action = Action::BareHand;
+                        return;
                     }
                     KeyCode::Char('c') => {
                         if key_event.modifiers.contains(KeyModifiers::CONTROL) {
